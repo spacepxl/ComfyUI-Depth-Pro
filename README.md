@@ -2,6 +2,10 @@
 
 Based on https://github.com/apple/ml-depth-pro
 
+## Example
+
+![img](https://github.com/spacepxl/ComfyUI-Depth-Pro/blob/main/example/workflow.png)
+
 ## License
 
 All code that is unique to this repository is covered by the Apache-2.0 license. Any 
