@@ -2,6 +2,14 @@
 
 Based on https://github.com/apple/ml-depth-pro
 
+## Tips
+
+The raw output of the depth model is metric depth (aka, distance from camera in meters) which may have values up in the hundreds or thousands for far away objects. This is great for projection to 3d, and you can use the focal length estimate to make a camera (focal_mm = focal_px * sensor_mm / sensor_px)
+
+In order to convert metric depth to relative depth, like what's needed for controlnet, the depth has to be remapped into the 0 to 1 range, which seems simple enough but is actually quite subjective. Try adjusting the `std_dev` (rejects extreme outlier values) and `gamma` (an exponent to bias the image brighter or darker) depending on the image or video.
+
+If you get errors about "vit_large_patch14_dinov2" make sure timm is up to date (tested with 0.9.16 and 1.0.9)
+
 ## Example
 
 ![img](https://github.com/spacepxl/ComfyUI-Depth-Pro/blob/main/example/workflow.png)
