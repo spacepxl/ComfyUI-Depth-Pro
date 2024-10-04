@@ -120,5 +120,5 @@ def create_vit(
         if len(missing_keys) != 0:
             raise KeyError(f"Keys are missing when loading vit: {missing_keys}")
 
-    LOGGER.info(model)
+    # LOGGER.info(model)
     return model.model

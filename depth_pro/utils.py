@@ -5,12 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
-import pillow_heif
 from PIL import ExifTags, Image, TiffTags
-from pillow_heif import register_heif_opener
-
-register_heif_opener()
-LOGGER = logging.getLogger(__name__)
 
 
 def extract_exif(img_pil: Image) -> Dict[str, Any]:
@@ -62,14 +57,9 @@ def load_rgb(
         f_px: The optional focal length in pixels, extracting from the exif data.
 
     """
-    LOGGER.debug(f"Loading image {path} ...")
 
     path = Path(path)
-    if path.suffix.lower() in [".heic"]:
-        heif_file = pillow_heif.open_heif(path, convert_hdr_to_8bit=True)
-        img_pil = heif_file.to_pillow()
-    else:
-        img_pil = Image.open(path)
+    img_pil = Image.open(path)
 
     img_exif = extract_exif(img_pil)
     icc_profile = img_pil.info.get("icc_profile", None)
@@ -84,7 +74,7 @@ def load_rgb(
         elif exif_orientation == 8:
             img_pil = img_pil.transpose(Image.ROTATE_90)
         elif exif_orientation != 1:
-            LOGGER.warning(f"Ignoring image orientation {exif_orientation}.")
+            pass
 
     img = np.array(img_pil)
     # Convert to RGB if single channel.
@@ -94,8 +84,6 @@ def load_rgb(
     if remove_alpha:
         img = img[:, :, :3]
 
-    LOGGER.debug(f"\tHxW: {img.shape[0]}x{img.shape[1]}")
-
     # Extract the focal length from exif data.
     f_35mm = img_exif.get(
         "FocalLengthIn35mmFilm",
@@ -104,7 +92,6 @@ def load_rgb(
         ),
     )
     if f_35mm is not None and f_35mm > 0:
-        LOGGER.debug(f"\tfocal length @ 35mm film: {f_35mm}mm")
         f_px = fpx_from_f35(img.shape[1], img.shape[0], f_35mm)
     else:
         f_px = None

@@ -9,6 +9,7 @@ from typing import Mapping, Optional, Tuple, Union
 
 import torch
 from torch import nn
+from safetensors import safe_open
 from torchvision.transforms import (
     Compose,
     ConvertImageDtype,
@@ -22,6 +23,7 @@ from .network.encoder import DepthProEncoder
 from .network.fov import FOVNetwork
 from .network.vit_factory import VIT_CONFIG_DICT, ViTPreset, create_vit
 
+import comfy.utils
 
 @dataclass
 class DepthProConfig:
@@ -70,9 +72,10 @@ def create_backbone_model(
 
 
 def create_model_and_transforms(
+    model_path,
     config: DepthProConfig = DEFAULT_MONODEPTH_CONFIG_DICT,
     device: torch.device = torch.device("cpu"),
-    precision: torch.dtype = torch.float32,
+    precision: torch.dtype = torch.float16,
 ) -> Tuple[DepthPro, Compose]:
     """Create a DepthPro model and load weights from `config.checkpoint_uri`.
 
@@ -117,10 +120,7 @@ def create_model_and_transforms(
         last_dims=(32, 1),
         use_fov_head=config.use_fov_head,
         fov_encoder=fov_encoder,
-    ).to(device)
-
-    if precision == torch.half:
-        model.half()
+    ).to(device, dtype=precision)
 
     transform = Compose(
         [
@@ -131,22 +131,21 @@ def create_model_and_transforms(
         ]
     )
 
-    if config.checkpoint_uri is not None:
-        state_dict = torch.load(config.checkpoint_uri, map_location="cpu")
-        missing_keys, unexpected_keys = model.load_state_dict(
-            state_dict=state_dict, strict=True
+    state_dict = comfy.utils.load_torch_file(model_path)
+    missing_keys, unexpected_keys = model.load_state_dict(
+        state_dict=state_dict, strict=True
+    )
+
+    if len(unexpected_keys) != 0:
+        raise KeyError(
+            f"Found unexpected keys when loading monodepth: {unexpected_keys}"
         )
 
-        if len(unexpected_keys) != 0:
-            raise KeyError(
-                f"Found unexpected keys when loading monodepth: {unexpected_keys}"
-            )
-
-        # fc_norm is only for the classification head,
-        # which we would not use. We only use the encoding.
-        missing_keys = [key for key in missing_keys if "fc_norm" not in key]
-        if len(missing_keys) != 0:
-            raise KeyError(f"Keys are missing when loading monodepth: {missing_keys}")
+    # fc_norm is only for the classification head,
+    # which we would not use. We only use the encoding.
+    missing_keys = [key for key in missing_keys if "fc_norm" not in key]
+    if len(missing_keys) != 0:
+        raise KeyError(f"Keys are missing when loading monodepth: {missing_keys}")
 
     return model, transform
 
