@@ -1,0 +1,15 @@
+[project]
+name = "comfyui-depth-pro"
+description = "Based on [a/https://github.com/apple/ml-depth-pro](https://github.com/apple/ml-depth-pro)"
+version = "1.0.0"
+license = {file = "LICENSE"}
+dependencies = ["timm>=0.9.16", "numpy<2"]
+
+[project.urls]
+Repository = "https://github.com/spacepxl/ComfyUI-Depth-Pro"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI-Depth-Pro"
+Icon = ""
