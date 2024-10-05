@@ -79,7 +79,7 @@ class DepthPro:
         depth = []
         focal_px = []
         
-        # add comfyui progress bar
+        pbar = comfy.utils.ProgressBar(rgb.size(0)) if comfy.utils.PROGRESS_BAR_ENABLED else None
         for i in trange(rgb.size(0)):
             rgb_image = rgb[i, :3].unsqueeze(0).to(device, dtype=dtype)
             rgb_image = transform(rgb_image)
@@ -87,6 +87,7 @@ class DepthPro:
             prediction = model.infer(rgb_image)
             depth.append(prediction["depth"].unsqueeze(-1))
             focal_px.append(prediction["focallength_px"].item())
+            if pbar is not None: pbar.update(1)
         
         depth = torch.stack(depth, dim=0).repeat(1,1,1,3)
         focal_list = focal_px

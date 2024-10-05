@@ -10,6 +10,8 @@ In order to convert metric depth to relative depth, like what's needed for contr
 
 If you get errors about "vit_large_patch14_dinov2" make sure timm is up to date (tested with 0.9.16 and 1.0.9)
 
+The "(Down)Load Depth Pro model" node will auto-download the model from huggingface, but if you want to manually download it, you can download it [from here](https://huggingface.co/spacepxl/ml-depth-pro/blob/main/depth_pro.fp16.safetensors) and place it in `ComfyUI/models/depth/ml-depth-pro/`
+
 ## Example
 
 ![img](https://github.com/spacepxl/ComfyUI-Depth-Pro/blob/main/example/workflow.png)
