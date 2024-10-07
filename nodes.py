@@ -93,7 +93,7 @@ class DepthPro:
         focal_list = focal_px
         focal_avg = np.mean(focal_px)
         
-        return (depth, focal_list, focal_avg)
+        return (depth.to("cpu"), focal_list, focal_avg)
 
 
 class MetricDepthToRelative:
