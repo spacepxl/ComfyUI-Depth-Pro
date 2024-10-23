@@ -59,14 +59,17 @@ class DepthPro:
                 "depth_pro_model": ("DEPTH_PRO_MODEL",),
                 "image": ("IMAGE",),
                 },
+            "optional": {
+                "focal_px": ("FLOAT", {"min": 0, "step": 0.01, "forceInput": True}),
+                }
             }
     
-    RETURN_TYPES = ("IMAGE", "LIST", "FLOAT",)
-    RETURN_NAMES = ("metric_depth", "focal_list", "focal_avg",)
+    RETURN_TYPES = ("IMAGE", "LIST", "FLOAT", "STRING",)
+    RETURN_NAMES = ("metric_depth", "focal_list", "focal_avg", "focal_str",)
     FUNCTION = "estimate_depth"
     CATEGORY = "Depth-Pro"
     
-    def estimate_depth(self, depth_pro_model, image):
+    def estimate_depth(self, depth_pro_model, image, focal_px=None):
         model = depth_pro_model["model"]
         device = depth_pro_model["device"]
         dtype = depth_pro_model["dtype"]
@@ -77,23 +80,28 @@ class DepthPro:
         rgb = rgb.movedim(-1, 1) # BCHW
         
         depth = []
-        focal_px = []
+        focal_list = []
+        if focal_px is not None:
+            if focal_px > 1:
+                focal_px = torch.tensor(focal_px)
+            else:
+                focal_px = None
         
         pbar = comfy.utils.ProgressBar(rgb.size(0)) if comfy.utils.PROGRESS_BAR_ENABLED else None
         for i in trange(rgb.size(0)):
             rgb_image = rgb[i, :3].unsqueeze(0).to(device, dtype=dtype)
             rgb_image = transform(rgb_image)
             
-            prediction = model.infer(rgb_image)
+            prediction = model.infer(rgb_image, f_px=focal_px)
             depth.append(prediction["depth"].unsqueeze(-1))
-            focal_px.append(prediction["focallength_px"].item())
+            focal_list.append(prediction["focallength_px"].item())
             if pbar is not None: pbar.update(1)
         
         depth = torch.stack(depth, dim=0).repeat(1,1,1,3)
-        focal_list = focal_px
-        focal_avg = np.mean(focal_px)
+        focal_avg = np.mean(focal_list)
+        focal_str = f"{focal_avg:0.2f}"
         
-        return (depth.to("cpu"), focal_list, focal_avg)
+        return (depth.to("cpu"), focal_list, focal_avg, focal_str)
 
 
 class MetricDepthToRelative:
@@ -150,11 +158,85 @@ class MetricDepthToInverse:
     def convert_depth(self, depth):
         return (1 / (1 + depth.detach().clone()), )
 
+
+class FocalFromList:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "focal_list": ("LIST",),
+                "batch_index": ("INT",),
+                },
+            }
+    
+    RETURN_TYPES = ("FLOAT", "STRING",)
+    RETURN_NAMES = ("focal", "focal_str",)
+    FUNCTION = "get_focal"
+    CATEGORY = "Depth-Pro"
+    
+    def get_focal(self, focal_list, batch_index):
+        idx = min(max(batch_index, 0), len(focal_list) - 1)
+        focal = focal_list[idx]
+        focal_str = f"{focal:0.2f}"
+        return (focal, focal_str)
+
+
+class FocalPXtoMM:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "focal_px": ("FLOAT", {"default": 1000, "min": 0.01, "step": 0.01,}),
+                "sensor_mm": ("FLOAT", {"default": 24.576, "min": 0.001, "step": 0.001,}),
+                "image_width": ("INT", {"default": 1024, "min": 1,}),
+                "image_height": ("INT", {"default": 1, "min": 1,}),
+                },
+            }
+    
+    RETURN_TYPES = ("FLOAT", "STRING",)
+    RETURN_NAMES = ("focal_mm", "focal_str",)
+    FUNCTION = "get_focal"
+    CATEGORY = "Depth-Pro"
+    
+    def get_focal(self, focal_px, sensor_mm, image_width, image_height):
+        sensor_px = max(image_width, image_height)
+        focal_mm = focal_px * sensor_mm / sensor_px
+        focal_str = f"{focal_mm:0.2f}"
+        return (focal_mm, focal_str)
+
+
+class FocalMMtoPX:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "focal_mm": ("FLOAT", {"default": 50, "min": 0.01, "step": 0.01,}),
+                "sensor_mm": ("FLOAT", {"default": 24.576, "min": 0.001, "step": 0.001,}),
+                "image_width": ("INT", {"default": 1024, "min": 1,}),
+                "image_height": ("INT", {"default": 1, "min": 1,}),
+                },
+            }
+    
+    RETURN_TYPES = ("FLOAT", "STRING",)
+    RETURN_NAMES = ("focal_px", "focal_str",)
+    FUNCTION = "get_focal"
+    CATEGORY = "Depth-Pro"
+    
+    def get_focal(self, focal_mm, sensor_mm, image_width, image_height):
+        sensor_px = max(image_width, image_height)
+        focal_px = focal_mm * sensor_px / sensor_mm
+        focal_str = f"{focal_px:0.2f}"
+        return (focal_px, focal_str)
+
+
 NODE_CLASS_MAPPINGS = {
     "LoadDepthPro": LoadDepthPro,
     "DepthPro": DepthPro,
     "MetricDepthToRelative": MetricDepthToRelative,
     "MetricDepthToInverse": MetricDepthToInverse,
+    "FocalFromList": FocalFromList,
+    "FocalPXtoMM": FocalPXtoMM,
+    "FocalMMtoPX": FocalMMtoPX,
     }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -162,4 +244,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DepthPro": "Depth Pro",
     "MetricDepthToRelative": "Metric Depth to Relative",
     "MetricDepthToInverse": "Metric Depth to Inverse",
+    "FocalFromList": "Focal from List",
+    "FocalPXtoMM": "Focal PX to MM",
+    "FocalMMtoPX": "Focal MM to PX",
     }
